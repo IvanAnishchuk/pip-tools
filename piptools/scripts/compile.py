@@ -173,7 +173,7 @@ def cli(verbose, dry_run, pre, rebuild, find_links, index_url, extra_index_url,
 
     try:
         resolver = Resolver(constraints, repository, prereleases=pre,
-                            clear_caches=rebuild)
+                            clear_caches=rebuild, allow_unsafe=self.allow_unsafe)
         results = resolver.resolve()
         if generate_hashes:
             hashes = resolver.resolve_hashes(results)

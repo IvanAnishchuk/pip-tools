@@ -20,6 +20,9 @@ from .utils import (format_requirement, format_specifier, full_groupby,
 green = partial(click.style, fg='green')
 magenta = partial(click.style, fg='magenta')
 
+# TODO: remove "unsafe" logic from writer because this supersedes it
+UNSAFE_PACKAGES = {'setuptools', 'distribute', 'pip'}  # Make configurable?
+
 
 def _dep_key(ireq):
     if ireq.req is None and ireq.link is not None:
@@ -49,13 +52,20 @@ class RequirementSummary(object):
 
 
 class Resolver(object):
-    def __init__(self, constraints, repository, cache=None, prereleases=False, clear_caches=False):
+    def __init__(self, constraints, repository, cache=None, prereleases=False, clear_caches=False, allow_unsafe=False):
         """
         This class resolves a given set of constraints (a collection of
         InstallRequirement objects) by consulting the given Repository and the
         DependencyCache.
         """
         self.our_constraints = set(constraints)
+
+        # Removing unsafe packages in case they were in our constraints
+        if not allow_unsafe:
+            for req in self.our_constraints:
+                if key_from_req(req.req) in UNSAFE_PACKAGES:
+                    self.our_constraints.remove(key_from_req(req.req))
+
         self.their_constraints = set()
         self.repository = repository
         if cache is None:
@@ -63,6 +73,7 @@ class Resolver(object):
         self.dependency_cache = cache
         self.prereleases = prereleases
         self.clear_caches = clear_caches
+        self.allow_unsafe = allow_unsafe
 
     @property
     def constraints(self):
@@ -188,6 +199,12 @@ class Resolver(object):
         theirs = set(self._group_constraints(dep
                      for best_match in best_matches
                      for dep in self._iter_dependencies(best_match)))
+
+        # Removing unsafe packages before they got resolved any further
+        if not allow_unsafe:
+            for req in theirs:
+                if key_from_req(req.req) in UNSAFE_PACKAGES:
+                    theirs.remove(key_from_req(req.req))
 
         # NOTE: We need to compare RequirementSummary objects, since
         # InstallRequirement does not define equality
